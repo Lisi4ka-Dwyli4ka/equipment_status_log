@@ -15,17 +15,12 @@ public class AuditoriaController {
     private final AuditoriaRepository auditoriaRepository;
 
     @GetMapping
-    public List<Auditoria> getAllAuditorias() {
+    public List<Auditoria> getAuditorias() {
         return auditoriaRepository.findAll();
     }
 
-    @GetMapping("/search")
-    public List<Auditoria> searchAuditorias(@RequestParam String name) {
-        return auditoriaRepository.findByNameContainingIgnoreCase(name);
-    }
-
     @PostMapping
-    public Auditoria createAuditoria(@RequestBody Auditoria auditoria) {
+    public Auditoria addAuditoria(@RequestBody Auditoria auditoria) {
         return auditoriaRepository.save(auditoria);
     }
 

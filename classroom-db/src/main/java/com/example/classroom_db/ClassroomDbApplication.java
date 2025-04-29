@@ -34,4 +34,5 @@ public class ClassroomDbApplication implements CommandLineRunner {
 			logger.error("❌ Ошибка подключения к PostgreSQL", e);
 		}
 	}
+
 }

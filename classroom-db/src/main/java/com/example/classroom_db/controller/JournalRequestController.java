@@ -1,29 +1,36 @@
 package com.example.classroom_db.controller;
-
 import com.example.classroom_db.entity.JournalRequest;
 import com.example.classroom_db.service.JournalRequestService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
+// JournalRequestController.java
 @RestController
 @RequestMapping("/api/requests")
 @RequiredArgsConstructor
 public class JournalRequestController {
+
     private final JournalRequestService journalRequestService;
 
     @GetMapping
-    public List<JournalRequest> getAllRequests() {
-        return journalRequestService.getAllRequests();
+    public ResponseEntity<List<JournalRequest>> getAllRequests() {
+        return ResponseEntity.ok(journalRequestService.getAllRequestsWithDetails());
     }
 
     @PostMapping
-    public JournalRequest createRequest(@RequestBody JournalRequest request) {
-        return journalRequestService.createRequest(request);
+    public ResponseEntity<JournalRequest> addRequest(@RequestBody JournalRequest request) {
+        JournalRequest savedRequest = journalRequestService.createRequest(request);
+        return ResponseEntity.ok(savedRequest);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteRequest(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteRequest(@PathVariable Long id) {
         journalRequestService.deleteRequest(id);
+        return ResponseEntity.noContent().build();
     }
+
+
 }

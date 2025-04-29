@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+
 @Entity
 @Table(name = "journal_requests")
 @Data
@@ -34,4 +35,6 @@ public class JournalRequest {
 
     @Column(nullable = false)
     private LocalDateTime date;
+
+
 }

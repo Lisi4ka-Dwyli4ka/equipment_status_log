@@ -15,17 +15,12 @@ public class EquipmentController {
     private final EquipmentRepository equipmentRepository;
 
     @GetMapping
-    public List<Equipment> getAllEquipment() {
+    public List<Equipment> getEquipment() {
         return equipmentRepository.findAll();
     }
 
-    @GetMapping("/search")
-    public List<Equipment> searchEquipment(@RequestParam String name) {
-        return equipmentRepository.findByNameContainingIgnoreCase(name);
-    }
-
     @PostMapping
-    public Equipment createEquipment(@RequestBody Equipment equipment) {
+    public Equipment addEquipment(@RequestBody Equipment equipment) {
         return equipmentRepository.save(equipment);
     }
 
