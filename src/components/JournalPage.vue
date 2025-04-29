@@ -1,11 +1,7 @@
 <script setup>
-//<button @click="resetDatabase" class="reset-btn">Сбросить базу данных</button>
-//хехехе... удалить все данные....хехе... можно поплакать об этом...(на случай если написано много плохих слов)
-//эти ваши "сбросить все" с вами в одной комнате?
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  initDB,
   getTeachers,
   addTeacher,
   deleteTeacher,
@@ -17,7 +13,8 @@ import {
   deleteEquipment,
   getRequests,
   deleteRequest,
-} from '../db/db.js'
+  logout as apiLogout,
+} from '../api/api.js'
 
 const router = useRouter()
 
@@ -42,18 +39,18 @@ const entryColors = ref({})
 
 // Методы
 
-const resetDatabase = async () => {
-  if (confirm('Вы уверены, что хотите сбросить базу данных? Все данные будут потеряны.')) {
-    try {
-      localStorage.removeItem('sqlite_db')
-      await initDB()
-      await loadData()
-      alert('База данных успешно сброшена к начальному состоянию')
-    } catch (error) {
-      console.error('Ошибка сброса базы данных:', error)
-      authError.value = 'Ошибка сброса базы данных'
-    }
+const loadColorsFromCookies = () => {
+  const colorsCookie = document.cookie.split('; ').find((row) => row.startsWith('entryColors='))
+
+  if (colorsCookie) {
+    const colorsJson = decodeURIComponent(colorsCookie.split('=')[1])
+    entryColors.value = JSON.parse(colorsJson)
   }
+}
+
+const saveColorsToCookies = () => {
+  const colorsJson = JSON.stringify(entryColors.value)
+  document.cookie = `entryColors=${encodeURIComponent(colorsJson)}; path=/; max-age=${60 * 60 * 24 * 30}` // 30 дней
 }
 
 const setEntryColor = (id, color) => {
@@ -61,17 +58,23 @@ const setEntryColor = (id, color) => {
     ...entryColors.value,
     [id]: color,
   }
+  saveColorsToCookies()
 }
 
 const resetEntryColor = (id) => {
   const newColors = { ...entryColors.value }
   delete newColors[id]
   entryColors.value = newColors
+  saveColorsToCookies()
+}
+// Добавляем новый метод для установки статуса записи
+const setEntryStatus = (id, status) => {
+  const color = status === 'APPROVED' ? 'green' : 'red'
+  setEntryColor(id, color)
 }
 
 const loadData = async () => {
   try {
-    await initDB()
     const [requests, teachersData, auditoriasData, equipmentData] = await Promise.all([
       getRequests(),
       getTeachers(),
@@ -93,6 +96,7 @@ const handleDeleteRequest = async (id) => {
     try {
       await deleteRequest(id)
       entries.value = await getRequests()
+      resetEntryColor(id)
     } catch (error) {
       console.error('Ошибка удаления:', error)
       authError.value = 'Ошибка при удалении'
@@ -106,6 +110,7 @@ const checkPassword = () => {
     authError.value = ''
     localStorage.setItem('journal_auth', 'true')
     loadData()
+    loadColorsFromCookies()
   } else {
     authError.value = 'Неверный пароль!'
     password.value = ''
@@ -122,6 +127,7 @@ const goBack = () => {
   router.push('/')
 }
 
+// Добавление преподавателя
 const handleAddTeacher = async () => {
   if (newTeacher.value.lastname && newTeacher.value.firstname) {
     try {
@@ -135,6 +141,7 @@ const handleAddTeacher = async () => {
   }
 }
 
+// Удаление преподавателя
 const handleDeleteTeacher = async (id) => {
   if (confirm('Удалить этого преподавателя?')) {
     try {
@@ -198,11 +205,12 @@ const handleDeleteEquipment = async (id) => {
 }
 
 // Загрузка данных при монтировании
-onMounted(() => {
-  if (isAuthenticated.value) {
-    loadData()
-  }
-})
+ onMounted(() => {
+   if (isAuthenticated.value) {
+     loadData()
+     loadColorsFromCookies()
+   }
+ });
 </script>
 
 <template>
@@ -358,21 +366,53 @@ onMounted(() => {
       <div class="p-8">
         <!-- Journal Tab -->
         <div v-if="activeTab === 'journal'">
-          <div class="overflow-x-auto bg-white rounded-lg shadow">
-            <table class="min-w-full divide-y divide-gray-200">
-              <!-- Заголовки таблицы без изменений -->
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr
-                  v-for="entry in entries"
-                  :key="entry.id"
-                  class="transition-colors duration-300"
-                  :class="{
-                    'bg-green-100 hover:bg-green-200': entryColors[entry.id] === 'green',
-                    'bg-blue-100 hover:bg-blue-200': entryColors[entry.id] === 'blue',
-                    'hover:bg-gray-100': !entryColors[entry.id],
-                  }"
-                >
-                  <!-- Ячейки с данными без изменений -->
+    <div class="overflow-x-auto bg-white rounded-lg shadow">
+      <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Дата
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Аудитория
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Преподаватель
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Оборудование
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Комментарий
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Действия
+                  </th>
+                </tr>
+              </thead>
+               <tbody class="bg-white divide-y divide-gray-200">
+          <tr
+            v-for="entry in entries"
+            :key="entry.id"
+            class="transition-colors duration-300"
+            :class="{
+              'bg-green-50 hover:bg-green-100': entryColors[entry.id] === 'green',
+              'bg-red-50 hover:bg-red-100': entryColors[entry.id] === 'red',
+              'hover:bg-gray-50': !entryColors[entry.id],
+            }"
+          >
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {{ new Date(entry.date).toLocaleString() }}
                   </td>
@@ -389,10 +429,11 @@ onMounted(() => {
                     {{ entry.comment || '-' }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <!-- Зеленая кнопка "Одобрено" -->
                     <button
-                      @click="setEntryColor(entry.id, 'green')"
-                      class="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors duration-200"
-                      title="Пометить зеленым"
+                      @click="setEntryStatus(entry.id, 'APPROVED')"
+                      class="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors duration-200 shadow hover:shadow-md"
+                      title="Одобрить"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -405,13 +446,16 @@ onMounted(() => {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
                       </svg>
                     </button>
+
+                    <!-- Красная кнопка "Критично" -->
                     <button
-                      @click="setEntryColor(entry.id, 'blue')"
-                      class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-200"
-                      title="Пометить голубым"
+                      @click="setEntryStatus(entry.id, 'REJECTED')"
+                      class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors duration-200 shadow hover:shadow-md"
+                      title="Пометить как критично"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -424,32 +468,15 @@ onMounted(() => {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
                       </svg>
                     </button>
-                    <button
-                      @click="resetEntryColor(entry.id)"
-                      class="px-2 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors duration-200"
-                      title="Сбросить цвет"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
+
+                    <!-- Кнопка удаления -->
                     <button
                       @click="handleDeleteRequest(entry.id)"
-                      class="px-2 py-1 text-red-600 bg-red-100 rounded hover:bg-red-200 transition-colors duration-200"
+                      class="p-2 text-red-600 bg-red-100 rounded-full hover:bg-red-200 transition-colors duration-200 shadow hover:shadow-md"
                       title="Удалить запись"
                     >
                       <svg
@@ -473,6 +500,75 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+        <!-- Teachers Tab -->
+        <div v-if="activeTab === 'teachers'">
+          <div class="bg-gray-50 p-6 rounded-lg mb-6">
+            <h3 class="text-lg font-medium text-gray-800 mb-4">Добавить преподавателя</h3>
+            <div class="space-y-4">
+              <input
+                v-model="newTeacher.lastname"
+                placeholder="Фамилия"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+              <input
+                v-model="newTeacher.firstname"
+                placeholder="Имя"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                @click="handleAddTeacher"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-medium text-gray-800 mb-4">Список преподавателей</h3>
+            <div class="overflow-x-auto bg-white rounded-lg shadow">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Фамилия
+                    </th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Имя
+                    </th>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Действия
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="teacher in teachers" :key="teacher.id" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {{ teacher.lastName }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {{ teacher.firstName }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        @click="handleDeleteTeacher(teacher.id)"
+                        class="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded"
+                      >
+                        Удалить
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 

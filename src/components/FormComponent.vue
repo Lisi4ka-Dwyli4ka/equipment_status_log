@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { initDB, getTeachers, getAuditorias, getEquipment, addRequest } from '../db/db.js'
+import { getTeachers, getAuditorias, getEquipment, addRequest } from '../api/api.js'
+
 const isAuthenticated = localStorage.getItem('journal_auth') === 'true'
 const router = useRouter()
 
@@ -17,37 +18,51 @@ const auditorias = ref([])
 const equipmentList = ref([])
 
 onMounted(async () => {
-  await initDB()
-  teachers.value = await getTeachers()
-  auditorias.value = await getAuditorias()
-  equipmentList.value = await getEquipment()
+  try {
+    // Удалено: await initDB()
+    teachers.value = await getTeachers()
+    auditorias.value = await getAuditorias()
+    equipmentList.value = await getEquipment()
+  } catch (error) {
+    console.error('Failed to load data:', error)
+    alert('Ошибка загрузки данных')
+  }
 })
 
 const submitForm = async () => {
   if (!form.value.teacher_id || !form.value.auditoria_id || !form.value.equipment_id) {
-    alert('Заполните все обязательные поля!')
-    return
+    alert('Заполните все обязательные поля!');
+    return;
   }
 
-  await addRequest({
-    teacher_id: form.value.teacher_id,
-    auditoria_id: form.value.auditoria_id,
-    equipment_id: form.value.equipment_id,
-    comment: form.value.comment,
-    date: new Date().toISOString(),
-  })
+  try {
+    const response = await addRequest({
+      teacherId: form.value.teacher_id,
+      auditoriaId: form.value.auditoria_id,
+      equipmentId: form.value.equipment_id,
+      comment: form.value.comment,
+      date: new Date().toISOString()
+    });
 
-  form.value = {
-    teacher_id: null,
-    auditoria_id: null,
-    equipment_id: null,
-    comment: '',
+    console.log('Success:', response); // Добавьте логирование ответа
+    
+    form.value = {
+      teacher_id: null,
+      auditoria_id: null,
+      equipment_id: null,
+      comment: ''
+    };
+    alert('Запись успешно добавлена!');
+  } catch (error) {
+    console.error('Failed to add request:', error);
+    alert('Ошибка при добавлении записи: ' + error.message);
   }
-  alert('Запись успешно добавлена!')
-}
+};
+
+
 // Для отладки
 const goToJournal = () => {
-  console.log('Кнопка нажата!') 
+  console.log('Кнопка нажата!')
   router
     .push('/journal')
     .then(() => console.log('Переход выполнен'))
@@ -60,21 +75,17 @@ const goToJournal = () => {
     <h2 class="text-xl font-semibold text-gray-800 mb-6">Новая запись в журнале</h2>
 
     <div class="mb-4">
-      <select 
-        v-model="form.teacher_id" 
-        required
-        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
+      <select v-model="form.teacher_id" class="w-full px-3 py-2 border rounded-md">
         <option :value="null">Выберите преподавателя</option>
         <option v-for="teacher in teachers" :key="teacher.id" :value="teacher.id">
-          {{ teacher.lastname }} {{ teacher.firstname }}
+          {{ teacher.lastName }} {{ teacher.firstName }}
         </option>
       </select>
     </div>
 
     <div class="mb-4">
-      <select 
-        v-model="form.auditoria_id" 
+      <select
+        v-model="form.auditoria_id"
         required
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
@@ -86,8 +97,8 @@ const goToJournal = () => {
     </div>
 
     <div class="mb-4">
-      <select 
-        v-model="form.equipment_id" 
+      <select
+        v-model="form.equipment_id"
         required
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
@@ -99,22 +110,22 @@ const goToJournal = () => {
     </div>
 
     <div class="mb-4">
-      <textarea 
-        v-model="form.comment" 
+      <textarea
+        v-model="form.comment"
         placeholder="Комментарий"
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
       ></textarea>
     </div>
 
     <div class="flex gap-3">
-      <button 
+      <button
         @click="submitForm"
         class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       >
         Добавить запись
       </button>
-      <button 
-        @click="goToJournal" 
+      <button
+        @click="goToJournal"
         class="flex-1 px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
       >
         Перейти в журнал
@@ -123,6 +134,4 @@ const goToJournal = () => {
   </div>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>
